@@ -73,7 +73,7 @@ erDiagram
 ---
 
 ## How to Launch
-*Note: Placed the Project to root directory
+*Note: Place the Project to root directory
 
 1. **Restore & Build**:
 dotnet restore

@@ -1,0 +1,6 @@
+@carpark_info_assignment_HostAddress = http://localhost:5068
+
+GET {{carpark_info_assignment_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

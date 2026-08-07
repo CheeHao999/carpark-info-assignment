@@ -1,53 +1,110 @@
-# Carpark-Info
-A take-home coding assignment for backend developer interview. 
+# Technical Documentation & System Setup
 
-## Your Task
-1. Given the CSV dataset (hdb-carpark-information-<timestamp>.csv) that contains details of a list of carparks, design the database to store the given information in the dataset and to support the below given user stories. ER diagram should be provided.
-2. Write a batch job that will process and store the information into the database of your choice. This is a daily delta file that will be interfaced over from source. In the event there is an error processing the records in the file, the entire file should rollback.
-3. Write the APIs that will fulfill the below given user stories. Swagger documentation should be provided. No front-end screens are required to be developed - just the APIs. However, you should be prepared to articulate how the APIs are envisoned to be utilised by the front-end developer. :)
+Comprehensive technical documentation, setup guide, and test suite verification for the Carpark Information Web API.
 
-### User Stories
-* As a user, I want to be able to filter the list of carpark by the following criteria:
-  - Carpark that offer free parking
-  - Carpark that offer night parking
-  - Carpark that can meet my vehicle height requirement.
-* As a user, I want to be able to add a specific carpark as my favourite.
+---
 
-## Getting Started
-Please review the information in this section before you get started with your development. 
+## Tech Stack
 
-* Create a personal fork of the project on Github.
-* Clone the fork on your local machine.
-* Implement your solution and the rest of git basics applies.
-* When you are ready, submit the forked repo for review by providing the link to the repo to our recruitment team.
+* **Framework**: .NET 10.0 (ASP.NET Core Web API)
+* **Database & ORM**: SQLite with Entity Framework Core 10.0
+* **CSV Processing**: CsvHelper (33.x)
+* **API Documentation**: Swashbuckle / Swagger UI
+* **Testing Engine**: xUnit with EF Core In-Memory Database
 
-### Tech Stack
-You may choose to develop the application using either of the following stack:
-* Spring Boot / Spring Batch with H2 database and ORM of your choice
-* .NET Core 6.x with SQLite database and ORM of your choice
-* Node.js with an in-memory database of your choice
+---
 
-Note: You are encouraged to try out .NET Core as Microsoft technologies are primarily used within the firm.
+## System Requirements
 
-### Tools
-You are free to choose the IDE (Integrated Development Environment) tool you are most comfortable with.
+* **SDK**: [.NET 10 SDK](https://dotnet.microsoft.com/download) (or .NET 8.0+)
+* **Database**: Embedded SQLite (automatically initialized at runtime)
+* **Operating System**: Windows 10/11, macOS, or Linux
+* **Terminal**: Git Bash, PowerShell, or standard zsh/bash shell
+* **API Client**: Web Browser (for Swagger UI) or cURL / Postman
 
-## Basic Expectation
-* Ability to design data schema, apply normalisation technique and enhance query performances, if applicable.
-* Write readable, maintainable, performant and well-documented codes.
-* Code design / architecture should support implementation of unit testing.
-* Code design / architecture should be flexible to changes / open to extensions, e.g. changing of data access technology, changing of interface file format from csv to JSON etc.
-* Write clear and concise commit message.
+---
 
-## Challenge Yourself
-Additional consideration to fine-tune your solution. It's not a must to implement in this assignment but please be prepared to discuss:
-* The dataset has the potential to be large in size.
-* Minimal human intervention for job recovery.
-* Secure coding practices
-* API authentication and authorisation
+## System Operations & Architecture
 
-## Time Estimates
-This assignment should take about 2 to 4 hours of your time depending on your level of experiences. 
+### 1. Database & ER Design
+* **`Carparks` Table**: Primary data entity identified by `CarParkNo` (Primary Key). Indexed on `GantryHeight` and `NightParking` for optimized dynamic range queries.
+* **`UserFavorites` Table**: Manages bookmarks linked via foreign key to `Carparks.CarParkNo`. Includes a composite unique index on `(UserId, CarParkNo)` to prevent duplicate entries at the database layer.
 
-## Need Help
-Create a github issue. We'll get back to you.
+## ER Diagram
+ER diagram showing the relationship between CARPARK and USER_FAVORITE tables.
+Used Markdown Preview Mermaid Support/mermaid.live to preview the ER Diagram.
+
+::: mermaid
+erDiagram
+    CARPARK ||--o{ USER_FAVORITE : "favorited by"
+    CARPARK {
+        string car_park_no PK
+        string address
+        decimal x_coord
+        decimal y_coord
+        string car_park_type
+        string type_of_parking_system
+        string short_term_parking
+        string free_parking
+        boolean night_parking
+        decimal gantry_height
+        int car_park_decks
+        boolean car_park_basement
+    }
+    USER_FAVORITE {
+        int id PK
+        string user_id
+        string car_park_no FK
+        datetime created_at
+    }
+:::
+
+
+### 2. Daily Delta Batch Ingestion & Transactional Rollback
+* **Ingestion Pipeline**: The batch job processes daily CSV delta files (`hdb-carpark-information-<timestamp>.csv`) uploaded via `POST /api/Carparks/upload` using CsvHelper.
+* **Atomic Rollback Safeguard**: Processing runs inside an explicit EF Core database transaction (`BeginTransactionAsync`). If any parsing error or invalid record is encountered mid-stream, `RollbackAsync()` is executed, restoring the database to its exact prior state without leaking partial records.
+* **Upsert Logic**: Updates existing carpark details matching `CarParkNo` and inserts new entries seamlessly.
+
+### 3. API & Front-End Integration Plan
+* **`POST /api/Carparks/upload`**: Ingests daily delta CSV files.
+* **`GET /api/Carparks`**: Accepts dynamic query filters (`FreeParking`, `NightParking`, `VehicleHeight`). Translates directly to SQL via `IQueryable<Carpark>`.
+* **`POST /api/Carparks/favorites`**: Bookmarks carparks per user. Returns HTTP `201 Created` on success and `409 Conflict` on duplicates.
+
+---
+
+## How to Launch
+
+1. **Restore & Build**:
+dotnet restore
+dotnet build
+
+2. **Run Application**:
+dotnet run
+
+3. **Access Swagger UI**:
+Open your browser and navigate to:
+http://localhost:5068/swagger
+
+
+
+## Testing
+
+### Automated Unit Tests
+Run the xUnit test suite using the .NET CLI:
+```bash
+dotnet test
+```
+
+### Manual Testing via Swagger UI
+1. **POST /api/Carparks/upload**
+   - Submit a valid CSV file to test ingestion and rollback logic.
+   - Verify 200 OK response.
+
+2. **GET /api/Carparks**
+   - Apply query filters (FreeParking, NightParking, VehicleHeight) to test dynamic query execution.
+   - Verify 200 OK response with filtered results.
+
+3. **POST /api/Carparks/favorites**
+   - Send a valid user ID and car park number to test bookmarking.
+   - Verify 201 Created response.
+   - Send the same request again to test duplicate prevention (should return 409 Conflict).
